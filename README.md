@@ -16,39 +16,25 @@ O sistema permite que usuários se cadastrem, consultem saldo/extrato e realizem
 ### Diagrama de Arquitetura
 
 ```mermaid
-flowchart TB
-    U[Usuário] --> AUTH{JWT Válido?}
-    AUTH -->|Não| LOGIN[Login / Emissão de Token JWT]
-    AUTH -->|Sim| FE[Frontend Web - React]
-    FE --> API[Backend Modular - Node.js/Express]
+flowchart TD
+    db1[(PostgreSQL)]
+    fila[[RabbitMQ]]
+    obs[[Prometheus + Grafana]]
 
-    subgraph API["Backend Modular"]
-        M0[Middleware Auth - Valida JWT]
-        M1[Módulo Contas]
-        M2[Módulo Transferência]
-    end
+    login[Login com JWT] --> API
+    db1 <--saldo, contas, auditoria--> API
+    API <--publica pedido--> fila
+    fila <--processa--> worker
 
-    API -->|Grava com status PENDENTE| DB[(PostgreSQL<br/>Contas / Transações)]
-    API -->|Enfileira comando de efetivação| FILA[[RabbitMQ]]
-    API -.->|Resposta rapida: recebido| U
+    worker <--atualiza status--> db1
+    worker --notifica--> app
 
-    FILA --> WORKER[Worker Assíncrono - Node.js]
-    WORKER -->|Atualiza status para CONCLUÍDO| DB
-    WORKER --> NOTIF[Notificação - WebSocket]
-    WORKER --> AUDIT[(Tabela de Auditoria<br/>Somente Insert)]
+    API <--monitorado por--> obs
+    worker <--monitorado por--> obs
 
-    subgraph OBS["Observabilidade"]
-        PROM[Prometheus - Coleta de Métricas]
-        GRAF[Grafana - Dashboards]
-        LOGS[Logs Centralizados]
-    end
-
-    API -.expõe métricas.-> PROM
-    WORKER -.expõe métricas.-> PROM
-    FILA -.expõe métricas.-> PROM
-    PROM --> GRAF
-    API -.envia logs.-> LOGS
-    WORKER -.envia logs.-> LOGS
+    API[API - Node.js]
+    worker[Worker Assíncrono]
+    app[App Mobile]
 ```
 
 ### Componentes
