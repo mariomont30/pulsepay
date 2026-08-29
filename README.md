@@ -198,12 +198,14 @@ O SLA original do projeto (**99,95% de disponibilidade** e **confirmação de tr
 
 ### 9. Disciplinas Críticas
 
-Integração e Entrega Contínua
-Desenvolvimento de Software Seguro – DevSecOps
-Testes Automatizados e Contínuos
-Monitoramento e Análise de Logs
-Direito Digital e LGPD
-Orquestração de Contêineres e Gerenciamento de Cluster
+Com base no escopo técnico e nas decisões de arquitetura deste projeto, as seguintes disciplinas do curso são consideradas mais críticas para o desenvolvimento e sustentação do PulsePay:
+
+- **Integração e Entrega Contínua**
+- **Desenvolvimento de Software Seguro – DevSecOps**
+- **Testes Automatizados e Contínuos**
+- **Monitoramento e Análise de Logs**
+- **Direito Digital e LGPD**
+- **Orquestração de Contêineres e Gerenciamento de Cluster**
 
 ## 10. Autores
 
