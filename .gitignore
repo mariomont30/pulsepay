@@ -1,0 +1,33 @@
+# Sistemas operacionais e IDEs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Segredos e configuração local
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Java / Gradle
+.gradle/
+build/
+out/
+*.class
+
+# Node.js
+node_modules/
+dist/
+coverage/
+*.log
+
+# Testes, ferramentas e infraestrutura
+.k6/
+.terraform/
+*.tfstate
+*.tfstate.*
+reports/
