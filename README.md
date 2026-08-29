@@ -11,7 +11,7 @@ O PulsePay é uma aplicação que simula uma fintech de pagamentos instantâneos
 
 O sistema permite que usuários se cadastrem, consultem saldo/extrato e realizem transferências entre contas, com efetivação processada de forma assíncrona via fila de mensagens, garantindo consistência e simulando uma trilha de auditoria imutável. O projeto mantém como meta de referência o SLA original do cenário proposto — **99,95% de disponibilidade** e **confirmação da transação em até 2 segundos** — validado via testes de carga e dashboards de observabilidade (Grafana), conforme detalhado na seção 6.
 
-**Arquitetura escolhida:** Monolito modular + fila de mensagens (Nível "Mediano"), com backend em Node.js, banco relacional PostgreSQL, fila RabbitMQ e worker assíncrono dedicado — tudo orquestrado via Docker Compose.
+**Arquitetura escolhida:** Monolito modular + fila de mensagens, com backend em Node.js, banco relacional PostgreSQL, fila RabbitMQ e worker assíncrono dedicado — tudo orquestrado via Docker Compose.
 
 ### Diagrama de Arquitetura
 
@@ -196,12 +196,21 @@ O SLA original do projeto (**99,95% de disponibilidade** e **confirmação de tr
 
 ---
 
-## 9. Autores
+### 9. Disciplinas Críticas
+
+Integração e Entrega Contínua
+Desenvolvimento de Software Seguro – DevSecOps
+Testes Automatizados e Contínuos
+Monitoramento e Análise de Logs
+Direito Digital e LGPD
+Orquestração de Contêineres e Gerenciamento de Cluster
+
+## 10. Autores
 
 - Kayan Kayser
 - Mário Gonçalves
-- Vicor Sabino
+- Victor Sabino
 
-## 10. Disciplina
+## 11. Disciplina
 
 Projeto de Software com DevOps — Pós-graduação
