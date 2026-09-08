@@ -1,0 +1,70 @@
+{
+  "title": "PulsePay - SLA e Observabilidade",
+  "uid": "pulsepay-sla",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Transferências confirmadas em até 2s (%)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 * sum(rate(pulsepay_transferencia_tempo_confirmacao_segundos_bucket{le=\"2\"}[5m])) / sum(rate(pulsepay_transferencia_tempo_confirmacao_segundos_count[5m]))",
+          "legendFormat": "% <= 2s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Transferências concluídas x falhas",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(pulsepay_transferencias_concluidas_total[1m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Latência da API (p95, segundos)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(pulsepay_http_request_duration_seconds_bucket[5m])) by (le, rota))",
+          "legendFormat": "{{rota}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Transferências solicitadas (RPS)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "rate(pulsepay_transferencias_solicitadas_total[1m])",
+          "legendFormat": "req/s"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Uptime dos containers (API e Worker)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "up{job=~\"pulsepay-api|pulsepay-worker\"}",
+          "legendFormat": "{{job}}"
+        }
+      ]
+    }
+  ]
+}
