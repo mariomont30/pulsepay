@@ -1,3 +1,47 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pulsepay
+    ports:
+      - '5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+
+  api:
+    build:
+      context: ./api
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pulsepay?schema=public
+      - RABBITMQ_URL=amqp://rabbitmq
+      - RABBITMQ_QUEUE=transferencias
+      - JWT_SECRET=dev-secret
+    ports:
+      - '4000:4000'
+    depends_on:
+      - postgres
+      - rabbitmq
+
+  worker:
+    build:
+      context: ./worker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/pulsepay?schema=public
+      - RABBITMQ_URL=amqp://rabbitmq
+      - RABBITMQ_QUEUE=transferencias
+    depends_on:
+      - postgres
+      - rabbitmq
+
+volumes:
+  db-data:
 version: "3.9"
 
 networks:
