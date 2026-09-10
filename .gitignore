@@ -1,1 +1,57 @@
-/Modelo
+# Node
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# Build output
+dist/
+build/
+out/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Prisma (generated client is under node_modules)
+# (node_modules/ already ignores generated client)
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Docker
+docker-compose.override.yml
+**/docker-compose.override.yml
+
+# Editor/IDE
+.vscode/
+.idea/
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Misc caches
+.cache/
+.parcel-cache/
+.next/
+/.vite/
+
+# Optional: lockfiles (uncomment if you DO NOT want to commit them)
+# package-lock.json
+# yarn.lock
