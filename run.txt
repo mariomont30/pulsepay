@@ -1,0 +1,232 @@
+==================================================================
+PULSEPAY - COMO RODAR O PROJETO (LEIA-ME)
+==================================================================
+Este arquivo explica passo a passo como instalar, inicializar e
+usar o PulsePay localmente. Projeto acadêmico/didático, sem
+processamento financeiro real.
+
+------------------------------------------------------------------
+1. PRÉ-REQUISITOS (o que precisa estar instalado na sua máquina)
+------------------------------------------------------------------
+
+OBRIGATÓRIO:
+- Docker Desktop (ou Docker Engine + Docker Compose no Linux)
+  -> https://www.docker.com/products/docker-desktop/
+  -> Verifique com: docker --version  e  docker compose version
+  -> Todo o projeto (frontend, API, worker, Postgres, RabbitMQ,
+     Prometheus, Grafana) roda dentro de containers. Se você só
+     for usar via Docker, NÃO precisa instalar Node.js nem Postgres
+     na máquina.
+
+- Git (para clonar/versionar o repositório)
+  -> https://git-scm.com/downloads
+
+OPCIONAL (só necessário se quiser rodar sem Docker, para
+desenvolver/debugar backend ou frontend fora de container):
+- Node.js 20+ e npm  -> https://nodejs.org/
+- PostgreSQL 16 (se quiser rodar localmente, fora do Docker)
+- RabbitMQ 3 (se quiser rodar localmente, fora do Docker)
+
+Portas usadas no host (verifique se estão livres antes de subir):
+- 3000  -> Frontend (React)
+- 4000  -> API (Node.js/Express)
+- 4001  -> Métricas do Worker (Prometheus scrape)
+- 5432  -> PostgreSQL
+- 5672  -> RabbitMQ (protocolo AMQP)
+- 15672 -> RabbitMQ Management (painel web)
+- 9090  -> Prometheus
+- 3001  -> Grafana
+
+------------------------------------------------------------------
+2. PRIMEIRA INICIALIZAÇÃO (passo a passo)
+------------------------------------------------------------------
+
+1) Clone o repositório e entre na pasta do projeto:
+   git clone https://github.com/mariomont30/pulsepay.git
+   cd pulsepay
+
+2) Copie o arquivo de variáveis de ambiente de exemplo:
+   cp .env.example .env
+   (No Windows/PowerShell: copy .env.example .env)
+
+   Abra o .env e ajuste se quiser (o padrão já funciona out-of-the-box
+   para uso local). NUNCA suba o arquivo .env real para o Git — ele
+   já está no .gitignore.
+
+3) Suba todos os containers (primeira vez faz o build das imagens):
+   docker compose up --build
+
+   Isso vai iniciar, na ordem correta (com healthcheck):
+   postgres -> rabbitmq -> api -> worker -> frontend -> prometheus -> grafana
+
+   Aguarde até ver no log algo como:
+   pulsepay-api      | [api] PulsePay API rodando na porta 4000
+   pulsepay-worker   | [worker] aguardando mensagens na fila de transferências...
+
+4) Em um SEGUNDO terminal (com os containers ainda rodando), aplique as
+   migrações do Prisma para criar as tabelas no Postgres. A migração
+   inicial (prisma/migrations/20250101000000_init) já vem pronta no
+   repositório, então basta aplicá-la — não é preciso gerar nada:
+   docker compose exec api npx prisma migrate deploy
+
+   Se no futuro você alterar o schema.prisma e quiser gerar uma NOVA
+   migração a partir dele:
+   docker compose exec api npx prisma migrate dev --name nome_da_mudanca
+
+5) Aplique a trigger de imutabilidade da tabela de auditoria
+   (ela só pode ser criada DEPOIS que a tabela "Auditoria" existir,
+   ou seja, depois do passo 4). Rode:
+   docker compose exec postgres psql -U pulsepay -d pulsepay -f /docker-entrypoint-initdb.d/01-audit-trigger.sql
+
+   (Usuário/senha/banco padrão vêm do .env: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB)
+
+6) Pronto! Acesse:
+   Frontend:            http://localhost:3000
+   API (health check):  http://localhost:4000/health
+   RabbitMQ Management: http://localhost:15672  (login: pulsepay / pulsepay123, ou o que você configurou no .env)
+   Prometheus:          http://localhost:9090
+   Grafana:             http://localhost:3001    (login: admin / admin, ou o que você configurou no .env)
+
+------------------------------------------------------------------
+3. USO DO SISTEMA (fluxo básico)
+------------------------------------------------------------------
+
+Via FRONTEND (http://localhost:3000):
+1) Clique em "Cadastre-se" e crie uma conta (nome, e-mail, CPF
+   fictício de 11 dígitos, senha). Toda conta nova já nasce com
+   saldo fictício inicial de R$ 1.000,00.
+2) Faça login. Você verá o saldo e o extrato (vazio no início).
+3) Cadastre um segundo usuário (em outra aba, ou peça para um colega)
+   para ter uma conta de destino. Copie o "ID da conta" (contaId)
+   que aparece no dashboard.
+4) No usuário de origem, clique em "Nova transferência", cole o
+   contaDestinoId e informe um valor. Você vai receber a resposta
+   HTTP 202 com status "PENDENTE" quase instantaneamente — isso é
+   a parte SÍNCRONA (README seção 6, meta < 500ms).
+5) Em segundo ou dois, o Worker assíncrono processa a fila do
+   RabbitMQ, efetiva o débito/crédito e atualiza o status para
+   "CONCLUÍDO". O usuário destinatário recebe uma notificação em
+   tempo real via WebSocket, e o saldo/extrato de ambos é atualizado
+   automaticamente na tela.
+
+Via API diretamente (ex.: Postman/Insomnia/curl):
+- POST http://localhost:4000/auth/registrar
+  body: { "nome": "...", "email": "...", "cpf": "12345678901", "senha": "123456" }
+- POST http://localhost:4000/auth/login
+  body: { "email": "...", "senha": "..." }
+  -> retorna { token, usuario }
+- GET  http://localhost:4000/contas/saldo        (header Authorization: Bearer <token>)
+- GET  http://localhost:4000/contas/extrato      (header Authorization: Bearer <token>)
+- POST http://localhost:4000/transferencias      (header Authorization: Bearer <token>)
+  body: { "contaDestinoId": "<uuid da conta destino>", "valor": 100.50 }
+- GET  http://localhost:4000/transferencias/:id  (header Authorization: Bearer <token>)
+
+------------------------------------------------------------------
+4. OBSERVABILIDADE (Prometheus + Grafana)
+------------------------------------------------------------------
+
+- A API expõe métricas em http://localhost:4000/metrics
+- O Worker expõe métricas em http://localhost:4001/metrics
+- O Prometheus já vem configurado (monitoring/prometheus.yml) para
+  coletar essas duas fontes automaticamente.
+- O Grafana já vem provisionado com o datasource do Prometheus e um
+  dashboard chamado "PulsePay - SLA e Observabilidade"
+  (pasta "PulsePay" no menu Dashboards), mostrando:
+  - % de transferências confirmadas em até 2s (meta de SLA)
+  - Transferências concluídas x falhas por minuto
+  - Latência p95 da API
+  - RPS de transferências solicitadas
+  - Uptime dos containers da API e do Worker
+
+  Para gerar carga e ver os gráficos se populando, use o k6 (seção 6
+  abaixo) ou simplesmente faça várias transferências manualmente.
+
+------------------------------------------------------------------
+5. TESTES AUTOMATIZADOS
+------------------------------------------------------------------
+
+Os testes (Jest + Supertest) usam mocks de Prisma/RabbitMQ, então
+NÃO precisam do Postgres/RabbitMQ reais rodando. Para executar:
+
+   cd backend
+   npm install
+   npm test
+
+Isso roda:
+- Testes unitários (regras de saldo/validação de payload com zod)
+- Teste de integração da rota POST /transferencias (retorno PENDENTE,
+  validação de payload, saldo insuficiente, autenticação)
+
+------------------------------------------------------------------
+6. TESTE DE CARGA (k6) — validação do SLA (Entrega 4)
+------------------------------------------------------------------
+
+O k6 não está pré-instalado no projeto; instale-o na sua máquina:
+  -> https://k6.io/docs/get-started/installation/
+
+Exemplo básico de script (crie um arquivo load-test.js na raiz):
+
+  import http from 'k6/http';
+  export const options = { vus: 50, duration: '30s' };
+  export default function () {
+    http.get('http://localhost:4000/health');
+  }
+
+Rode com:
+   k6 run load-test.js
+
+Para testar o fluxo completo de transferência sob carga, adapte o
+script para primeiro logar (POST /auth/login), guardar o token, e
+então disparar POST /transferencias repetidamente — acompanhando os
+resultados no dashboard do Grafana em tempo real.
+
+------------------------------------------------------------------
+7. COMANDOS ÚTEIS DO DIA A DIA
+------------------------------------------------------------------
+
+- Subir tudo em segundo plano:        docker compose up -d
+- Ver logs de um serviço:             docker compose logs -f api
+                                       docker compose logs -f worker
+- Parar tudo (mantendo os dados):     docker compose stop
+- Parar e remover containers:         docker compose down
+- Parar e apagar TAMBÉM os volumes
+  (zera banco, filas, dashboards):    docker compose down -v
+- Rebuildar só um serviço:            docker compose up -d --build api
+- Abrir o Prisma Studio (visualizar/editar dados no navegador):
+     docker compose exec api npx prisma studio
+     (acesse depois em http://localhost:5555 — pode ser necessário
+      expor a porta 5555 no docker-compose.yml se for usar sempre)
+- Entrar no banco via psql:
+     docker compose exec postgres psql -U pulsepay -d pulsepay
+- Habilitar métricas Prometheus nativas do RabbitMQ (opcional):
+     docker compose exec rabbitmq rabbitmq-plugins enable rabbitmq_prometheus
+
+------------------------------------------------------------------
+8. RESOLUÇÃO DE PROBLEMAS (troubleshooting)
+------------------------------------------------------------------
+
+- "API não conecta no Postgres/RabbitMQ": aguarde mais um pouco — o
+  compose usa healthcheck para só iniciar api/worker depois que
+  postgres e rabbitmq estiverem prontos, mas a primeira subida pode
+  demorar 15-30s. Veja: docker compose logs -f postgres rabbitmq
+
+- "Erro ao rodar prisma migrate": confirme que os containers
+  postgres e api estão "healthy"/"running" com docker compose ps
+  antes de rodar o comando do passo 4.
+
+- "Porta já em uso": outro processo na sua máquina está usando uma
+  das portas listadas na seção 1. Altere a porta correspondente no
+  .env (ex.: FRONTEND_PORT, API_PORT) e rode docker compose up -d
+  novamente.
+
+- "Quero resetar tudo do zero": docker compose down -v && docker
+  compose up --build (e repita os passos 4 e 5).
+
+- "The table `public.Usuario` does not exist" ao cadastrar/logar:
+  significa que o passo 4 (prisma migrate deploy) não foi executado
+  ainda, ou falhou silenciosamente. Confirme rodando:
+     docker compose exec api npx prisma migrate status
+  Se aparecer "Following migration have not yet been applied",
+  rode novamente: docker compose exec api npx prisma migrate deploy
+
+==================================================================

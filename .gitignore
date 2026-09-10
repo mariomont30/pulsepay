@@ -55,3 +55,39 @@ Desktop.ini
 # Optional: lockfiles (uncomment if you DO NOT want to commit them)
 # package-lock.json
 # yarn.lock
+# Dependências
+node_modules/
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Builds
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma
+backend/prisma/migrations/dev.db
+
+# Docker
+docker-compose.override.yml
+
+# Dados de containers (persistidos localmente)
+postgres-data/
+rabbitmq-data/
+grafana-data/
+prometheus-data/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Testes
+coverage/

@@ -1,0 +1,74 @@
+generator client {
+  provider      = "prisma-client-js"
+  // "native" cobre o ambiente local (Mac/Windows/Linux com glibc) usado ao
+  // rodar `npx prisma` fora do Docker; "linux-musl-openssl-3.0.x" é o engine
+  // correto para a imagem node:20-alpine (musl + OpenSSL 3.0) usada nos
+  // Dockerfiles da API/Worker. Sem isso, o Prisma baixa por padrão um engine
+  // "linux-musl" antigo (compilado contra OpenSSL 1.1), que não existe mais
+  // no Alpine atual — causa do erro "Error loading shared library libssl.so.1.1".
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StatusTransacao {
+  PENDENTE
+  CONCLUIDO
+  FALHOU
+}
+
+model Usuario {
+  id        String   @id @default(uuid())
+  nome      String
+  email     String   @unique
+  cpf       String   @unique
+  senhaHash String
+  criadoEm  DateTime @default(now())
+
+  conta Conta?
+}
+
+model Conta {
+  id        String   @id @default(uuid())
+  usuarioId String   @unique
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  saldo     Decimal  @default(0) @db.Decimal(14, 2)
+  status    String   @default("ATIVA")
+  criadoEm  DateTime @default(now())
+
+  transacoesEnviadas  Transacao[] @relation("ContaOrigem")
+  transacoesRecebidas Transacao[] @relation("ContaDestino")
+}
+
+model Transacao {
+  id             String           @id @default(uuid())
+  contaOrigemId  String
+  contaOrigem    Conta            @relation("ContaOrigem", fields: [contaOrigemId], references: [id])
+  contaDestinoId String
+  contaDestino   Conta            @relation("ContaDestino", fields: [contaDestinoId], references: [id])
+  valor          Decimal          @db.Decimal(14, 2)
+  status         StatusTransacao  @default(PENDENTE)
+  criadoEm       DateTime         @default(now())
+  concluidoEm    DateTime?
+  motivoFalha    String?
+
+  auditorias Auditoria[]
+
+  @@index([contaOrigemId])
+  @@index([contaDestinoId])
+  @@index([status])
+}
+
+// Tabela append-only (somente INSERT). A trigger que bloqueia UPDATE/DELETE
+// é criada em db/init/01-audit-trigger.sql após a migração inicial.
+model Auditoria {
+  id          String    @id @default(uuid())
+  transacaoId String?
+  transacao   Transacao? @relation(fields: [transacaoId], references: [id])
+  evento      String
+  detalhes    Json?
+  criadoEm    DateTime  @default(now())
+}

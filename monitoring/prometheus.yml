@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "pulsepay-api"
+    static_configs:
+      - targets: ["api:4000"]
+
+  - job_name: "pulsepay-worker"
+    static_configs:
+      - targets: ["worker:4001"]
+
+  # RabbitMQ expõe métricas Prometheus nativamente a partir da imagem
+  # rabbitmq:3-management com o plugin rabbitmq_prometheus habilitado.
+  # Caso o plugin não esteja ativo, este job simplesmente falhará ao
+  # coletar (sem impacto nos demais); habilite com:
+  #   docker exec pulsepay-rabbitmq rabbitmq-plugins enable rabbitmq_prometheus
+  - job_name: "pulsepay-rabbitmq"
+    static_configs:
+      - targets: ["rabbitmq:15692"]
