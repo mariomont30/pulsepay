@@ -40,13 +40,71 @@ jobs:
       - name: Build imagem do Frontend
         run: docker build -t pulsepay-frontend:ci ./frontend
 
+  # Entrega 4 (README seção 3): sobe a stack REAL via Docker Compose e roda,
+  # contra ela, os testes que dependem de infraestrutura de verdade —
+  # fluxo assíncrono, concorrência/race condition, imutabilidade da
+  # auditoria — e o teste de carga com k6 que valida o SLA (seção 6).
+  teste-integracao-e-carga:
+    name: Testes de Integração + Carga (k6) - Entrega 4
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar .env
+        run: cp .env.example .env
+
+      - name: Subir stack completa (Docker Compose)
+        run: docker compose up -d --build postgres rabbitmq api worker
+
+      - name: Aguardar API ficar saudável
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health > /dev/null; then
+              echo "API disponível."
+              exit 0
+            fi
+            echo "Aguardando API... ($i/30)"
+            sleep 2
+          done
+          echo "API não ficou saudável a tempo."
+          docker compose logs
+          exit 1
+
+      - name: Aplicar migrações do Prisma
+        run: docker compose exec -T api npx prisma migrate deploy
+
+      - name: Rodar testes de integração (fluxo assíncrono, concorrência, imutabilidade)
+        run: docker compose exec -T api npm run test:integracao
+
+      - name: Instalar k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Rodar teste de carga (k6) - valida SLA da seção 6 do README
+        id: k6
+        # continue-on-error: um teste de carga real pode revelar que o
+        # ambiente/hardware atual não sustenta a meta de SLA sob pico -
+        # isso é um RESULTADO válido (README seção 7: "SLA simulado não
+        # bater com o real"), não deve travar o pipeline. O resumo fica
+        # nos logs para embasar os "ajustes finais de performance" da
+        # Entrega 4.
+        continue-on-error: true
+        env:
+          API_URL: http://localhost:4000
+        run: k6 run backend/scripts/load-test.k6.js
+
+      - name: Encerrar stack
+        if: always()
+        run: docker compose down -v
+
   # Deploy real fora do escopo acadêmico (README seção "Fora do escopo").
   # Job abaixo documenta como seria o CD via Docker Compose em um
   # ambiente de homologação com acesso SSH configurado nos secrets do repo.
   deploy:
     name: Deploy (Docker Compose)
     runs-on: ubuntu-latest
-    needs: build-images
+    needs: teste-integracao-e-carga
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Placeholder de deploy

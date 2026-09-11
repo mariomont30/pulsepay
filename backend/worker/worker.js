@@ -143,7 +143,13 @@ async function iniciar() {
   await iniciarConsumidorTransferencias();
 }
 
-iniciar().catch((err) => {
-  console.error("[worker] falha fatal ao iniciar:", err);
-  process.exit(1);
-});
+// Só dispara o bootstrap real quando o arquivo é executado diretamente
+// (`node worker/worker.js`), e não quando é `require`'ido pelos testes.
+if (require.main === module) {
+  iniciar().catch((err) => {
+    console.error("[worker] falha fatal ao iniciar:", err);
+    process.exit(1);
+  });
+}
+
+module.exports = { efetivarTransferencia, iniciarConsumidorTransferencias, iniciarServidorMetricas };

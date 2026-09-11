@@ -22,10 +22,12 @@ OBRIGATÓRIO:
   -> https://git-scm.com/downloads
 
 OPCIONAL (só necessário se quiser rodar sem Docker, para
-desenvolver/debugar backend ou frontend fora de container):
+desenvolver/debugar backend ou frontend fora de container, ou rodar o
+teste de carga):
 - Node.js 20+ e npm  -> https://nodejs.org/
 - PostgreSQL 16 (se quiser rodar localmente, fora do Docker)
 - RabbitMQ 3 (se quiser rodar localmente, fora do Docker)
+- k6 (para o teste de carga da seção 6) -> https://k6.io/docs/get-started/installation/
 
 Portas usadas no host (verifique se estão livres antes de subir):
 - 3000  -> Frontend (React)
@@ -145,40 +147,76 @@ Via API diretamente (ex.: Postman/Insomnia/curl):
 5. TESTES AUTOMATIZADOS
 ------------------------------------------------------------------
 
-Os testes (Jest + Supertest) usam mocks de Prisma/RabbitMQ, então
-NÃO precisam do Postgres/RabbitMQ reais rodando. Para executar:
+5.1) Testes unitários e de integração mockada (rápidos, sem infra real)
+
+Usam mocks de Prisma/RabbitMQ, então NÃO precisam do Postgres/RabbitMQ
+reais rodando. Para executar:
 
    cd backend
    npm install
    npm test
 
 Isso roda:
-- Testes unitários (regras de saldo/validação de payload com zod)
+- Testes unitários (regras de saldo, validação de payload com zod, lógica
+  de efetivação do Worker: idempotência, saldo insuficiente, sucesso)
 - Teste de integração da rota POST /transferencias (retorno PENDENTE,
   validação de payload, saldo insuficiente, autenticação)
+
+5.2) Testes de integração REAL (fluxo assíncrono, concorrência,
+     imutabilidade) — README seção 4, Entrega 4
+
+Estes rodam contra a stack DE VERDADE (API + Worker + RabbitMQ + Postgres
+já subidos via docker compose), pois validam comportamento que só existe
+com infraestrutura real (lock de banco, fila, trigger SQL):
+
+   docker compose up -d --build
+   docker compose exec api npx prisma migrate deploy
+   docker compose exec api npm run test:integracao
+
+Isso roda em sequência:
+- test:fluxo-assincrono  -> solicita uma transferência real e confirma que
+  o Worker a leva de PENDENTE a CONCLUÍDO dentro do tempo esperado
+- test:concorrencia      -> dispara 5 transferências simultâneas da mesma
+  conta (README seção 7: risco de "Race condition") e confirma que o
+  saldo NUNCA fica negativo e que ao menos uma falha corretamente por
+  saldo insuficiente (prova de que o lock pessimista está funcionando)
+- test:imutabilidade     -> conecta direto no Postgres e tenta UPDATE/
+  DELETE na tabela "Auditoria", confirmando que a trigger bloqueia
+
+Cada um também pode ser rodado individualmente:
+   docker compose exec api npm run test:fluxo-assincrono
+   docker compose exec api npm run test:concorrencia
+   docker compose exec api npm run test:imutabilidade
 
 ------------------------------------------------------------------
 6. TESTE DE CARGA (k6) — validação do SLA (Entrega 4)
 ------------------------------------------------------------------
 
-O k6 não está pré-instalado no projeto; instale-o na sua máquina:
-  -> https://k6.io/docs/get-started/installation/
+Já existe um script pronto em backend/scripts/load-test.k6.js,
+implementando exatamente o cenário da seção 6 do README:
+- carga constante de ~40 req/s por 1 minuto
+- pico de ~150 req/s por 1 minuto (simulando dia de pagamento de salário)
+- valida os 3 alvos de SLA automaticamente (thresholds do k6):
+  - latência síncrona da API p95 < 500ms
+  - confirmação ponta a ponta (polling em /transferencias/:id) p95 <= 2s
+  - taxa de falha HTTP < 0,05% (equivalente à meta de 99,95% de uptime)
 
-Exemplo básico de script (crie um arquivo load-test.js na raiz):
+Instale o k6 na sua máquina: https://k6.io/docs/get-started/installation/
 
-  import http from 'k6/http';
-  export const options = { vus: 50, duration: '30s' };
-  export default function () {
-    http.get('http://localhost:4000/health');
-  }
+Com a stack já rodando (docker compose up -d):
+   API_URL=http://localhost:4000 k6 run backend/scripts/load-test.k6.js
 
-Rode com:
-   k6 run load-test.js
+Ao final, o k6 imprime um resumo comparando os p95 medidos com as metas
+do README, além do relatório completo padrão do k6 (thresholds
+PASSED/FAILED). Acompanhe também o dashboard do Grafana
+(http://localhost:3001) em tempo real durante a execução.
 
-Para testar o fluxo completo de transferência sob carga, adapte o
-script para primeiro logar (POST /auth/login), guardar o token, e
-então disparar POST /transferencias repetidamente — acompanhando os
-resultados no dashboard do Grafana em tempo real.
+Nota honesta: como o ambiente é local (Docker Compose, sem redundância
+real — ver README seção 6), é esperado e válido que, sob o pico de
+150 req/s, alguns thresholds fiquem no limite ou falhem dependendo do
+hardware da máquina. Isso é justamente o que a Entrega 4 pede para
+documentar (seção 7: "SLA simulado não bater com o real") e para embasar
+os ajustes finais de performance.
 
 ------------------------------------------------------------------
 7. COMANDOS ÚTEIS DO DIA A DIA
