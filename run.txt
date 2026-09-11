@@ -44,7 +44,7 @@ Portas usadas no host (verifique se estão livres antes de subir):
 ------------------------------------------------------------------
 
 1) Clone o repositório e entre na pasta do projeto:
-   git clone <url-do-seu-repositorio>
+   git clone https://github.com/mariomont30/pulsepay.git
    cd pulsepay
 
 2) Copie o arquivo de variáveis de ambiente de exemplo:
