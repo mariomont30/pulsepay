@@ -4,7 +4,7 @@
 
 1. Transferência direta entre duas contas, com validação de saldo, débito e crédito atômicos e exibição do resultado ao usuário.
 
-2. Transferência processada por RabbitMQ e worker, com status `PENDENTE` na solicitação e consulta até a conclusão.
+2. Transferência processada por fila (RabbitMQ e Worker), com status `PENDENTE` na solicitação e consulta até a conclusão.
 
 3. Transferência confiável mesmo com concorrência ou falhas, usando idempotência, retentativas, auditoria e confirmação em até 2 segundos no cenário de teste.
 
