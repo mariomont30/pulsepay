@@ -75,6 +75,13 @@ jobs:
       - name: Aplicar migrações do Prisma
         run: docker compose exec -T api npx prisma migrate deploy
 
+      - name: Aplicar trigger de imutabilidade da auditoria
+        # Só pode ser criada DEPOIS que "prisma migrate deploy" cria a
+        # tabela "Auditoria" - por isso não pode ficar só no
+        # docker-entrypoint-initdb.d (que roda antes da tabela existir).
+        # Ver também run.txt seção 2, passo 5.
+        run: docker compose exec -T postgres psql -U pulsepay -d pulsepay -f /docker-entrypoint-initdb.d/01-audit-trigger.sql
+
       - name: Rodar testes de integração (fluxo assíncrono, concorrência, imutabilidade)
         run: docker compose exec -T api npm run test:integracao
 

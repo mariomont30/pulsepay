@@ -103,7 +103,12 @@ async function efetivarTransferencia(transacaoId) {
 
 async function iniciarConsumidorTransferencias() {
   const canal = getChannel();
-  await canal.prefetch(10);
+  // Prefetch configurável: quantas mensagens o worker processa em paralelo.
+  // 10 é conservador demais para o cenário de pico do README (~150 req/s);
+  // valor maior permite mais transações concorrentes (cada uma serializada
+  // apenas quando toca a MESMA conta, via lock do Postgres).
+  const prefetch = Number(process.env.WORKER_PREFETCH || 50);
+  await canal.prefetch(prefetch);
 
   await canal.consume(FILA_TRANSFERENCIAS, async (msg) => {
     if (!msg) return;

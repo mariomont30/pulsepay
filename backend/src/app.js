@@ -30,8 +30,14 @@ function criarApp() {
   app.use("/transferencias", transferenciasRoutes);
 
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-    console.error(err);
+    // Em teste (NODE_ENV=test, definido automaticamente pelo Jest), erros
+    // esperados (ex.: 422 "saldo insuficiente" testado de propósito) não
+    // são logados, para não confundir com uma falha real do teste.
+    // Erros inesperados (5xx) continuam sendo logados mesmo em teste.
     const status = err.status || 500;
+    if (process.env.NODE_ENV !== "test" || status >= 500) {
+      console.error(err);
+    }
     res.status(status).json({ erro: err.message || "Erro interno do servidor" });
   });
 
