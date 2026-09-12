@@ -60,6 +60,9 @@ model Transacao {
   @@index([contaOrigemId])
   @@index([contaDestinoId])
   @@index([status])
+  // ADR-0003, ponto 8: índice compatível com a ordenação cronológica do
+  // extrato (criadoEm desc, id desc como desempate).
+  @@index([criadoEm])
 }
 
 // Tabela append-only (somente INSERT). A trigger que bloqueia UPDATE/DELETE

@@ -15,6 +15,7 @@
     "prisma:studio": "prisma studio",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
+    "test:adr": "jest --config jest.adr.config.js --runInBand",
     "test:integracao": "node scripts/rodar-testes-integracao.js",
     "test:fluxo-assincrono": "node scripts/testar-fluxo-assincrono.js",
     "test:concorrencia": "node scripts/testar-concorrencia.js",

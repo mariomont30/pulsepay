@@ -44,7 +44,7 @@ Portas usadas no host (verifique se estão livres antes de subir):
 ------------------------------------------------------------------
 
 1) Clone o repositório e entre na pasta do projeto:
-   git clone https://github.com/mariomont30/pulsepay.git
+   git clone <url-do-seu-repositorio>
    cd pulsepay
 
 2) Copie o arquivo de variáveis de ambiente de exemplo:
@@ -219,7 +219,43 @@ documentar (seção 7: "SLA simulado não bater com o real") e para embasar
 os ajustes finais de performance.
 
 ------------------------------------------------------------------
-7. COMANDOS ÚTEIS DO DIA A DIA
+7. CONFORMIDADE COM OS ADRs (pipeline separada, não bloqueante)
+------------------------------------------------------------------
+
+O projeto documenta decisões arquiteturais em docs/adr/ (ADR-0001:
+transferência assíncrona; ADR-0002: autenticação JWT; ADR-0003: extrato
+cronológico). Cada ADR tem uma suíte de testes de conformidade dedicada
+em backend/tests/adr/, que verifica, ponto a ponto, se o código
+implementa fielmente o que foi decidido (ex.: "a transferência é gravada
+como PENDENTE antes de publicar na fila", "o token contém sub e exp",
+"o extrato ordena por data com id como desempate").
+
+Rodar localmente:
+   cd backend
+   npm install
+   npm run test:adr
+
+Essa suíte roda separada do `npm test` principal (jest.adr.config.js vs
+jest.config.js) de propósito: ela pode legitimamente ter pontos
+reprovados sem que isso quebre a suíte funcional principal.
+
+No GitHub, existe um SEGUNDO workflow só para isso:
+.github/workflows/adr-compliance.yml (rodando em paralelo ao ci.yml
+principal). Ele é intencionalmente NÃO BLOQUEANTE (continue-on-error) -
+mesmo que algum ponto de um ADR ainda não esteja implementado, o
+pipeline não falha por causa disso. Em vez de travar o merge, ele:
+- publica um relatório em Markdown na aba "Summary" da execução no
+  GitHub Actions, com uma tabela ✅/❌ por ADR e por decisão verificada;
+- anexa o JSON bruto dos resultados como artefato do workflow;
+- emite um aviso (::warning::) visível na lista de execuções quando algo
+  não passou, sem marcar o commit/PR como quebrado.
+
+Isso permite acompanhar ao longo do tempo se a implementação continua
+fiel às decisões registradas, sem impedir o progresso do time por causa
+de gaps já conhecidos/documentados.
+
+------------------------------------------------------------------
+8. COMANDOS ÚTEIS DO DIA A DIA
 ------------------------------------------------------------------
 
 - Subir tudo em segundo plano:        docker compose up -d
@@ -240,7 +276,7 @@ os ajustes finais de performance.
      docker compose exec rabbitmq rabbitmq-plugins enable rabbitmq_prometheus
 
 ------------------------------------------------------------------
-8. RESOLUÇÃO DE PROBLEMAS (troubleshooting)
+9. RESOLUÇÃO DE PROBLEMAS (troubleshooting)
 ------------------------------------------------------------------
 
 - "API não conecta no Postgres/RabbitMQ": aguarde mais um pouco — o

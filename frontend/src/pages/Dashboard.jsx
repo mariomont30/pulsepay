@@ -7,28 +7,40 @@ export default function Dashboard() {
   const { usuario, sair, notificacoes } = useAuth();
   const [saldo, setSaldo] = useState(null);
   const [extrato, setExtrato] = useState([]);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
   const [carregando, setCarregando] = useState(true);
   const navigate = useNavigate();
 
-  async function carregarDados() {
+  async function carregarDados(paginaAlvo = pagina) {
     setCarregando(true);
-    const [dadosSaldo, dadosExtrato] = await Promise.all([consultarSaldo(), consultarExtrato()]);
+    const [dadosSaldo, dadosExtrato] = await Promise.all([
+      consultarSaldo(),
+      consultarExtrato({ pagina: paginaAlvo, porPagina: 10 }),
+    ]);
     setSaldo(dadosSaldo);
-    setExtrato(dadosExtrato);
+    setExtrato(dadosExtrato.dados);
+    setTotalPaginas(dadosExtrato.paginacao.totalPaginas);
     setCarregando(false);
   }
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(1);
   }, []);
 
   // Sempre que uma notificação de transferência concluída chega via WebSocket,
-  // recarrega saldo e extrato para refletir o novo estado.
+  // recarrega saldo e extrato (primeira página) para refletir o novo estado.
   useEffect(() => {
     if (notificacoes.length > 0) {
-      carregarDados();
+      setPagina(1);
+      carregarDados(1);
     }
   }, [notificacoes]);
+
+  function irParaPagina(novaPagina) {
+    setPagina(novaPagina);
+    carregarDados(novaPagina);
+  }
 
   function handleSair() {
     sair();
@@ -97,6 +109,20 @@ export default function Dashboard() {
           )}
         </tbody>
       </table>
+
+      {totalPaginas > 1 && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+          <button disabled={pagina <= 1} onClick={() => irParaPagina(pagina - 1)}>
+            Anterior
+          </button>
+          <span style={{ fontSize: 14 }}>
+            Página {pagina} de {totalPaginas}
+          </span>
+          <button disabled={pagina >= totalPaginas} onClick={() => irParaPagina(pagina + 1)}>
+            Próxima
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,7 +11,8 @@ async function saldo(req, res, next) {
 
 async function extrato(req, res, next) {
   try {
-    const resultado = await contasService.consultarExtrato(req.usuario.id);
+    const { pagina, porPagina } = req.query;
+    const resultado = await contasService.consultarExtrato(req.usuario.id, { pagina, porPagina });
     return res.status(200).json(resultado);
   } catch (err) {
     return next(err);

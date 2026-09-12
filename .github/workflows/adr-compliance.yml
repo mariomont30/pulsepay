@@ -1,0 +1,62 @@
+name: PulsePay ADR Compliance
+
+# Pipeline SEPARADO do CI principal (ci.yml). Objetivo: verificar se o
+# código implementa fielmente as decisões registradas nos ADRs
+# (docs/adr/*.md), e dar visibilidade contínua sobre isso - mesmo que
+# algum ponto decidido ainda não esteja implementado. Por isso, ao
+# contrário do ci.yml, este workflow NUNCA falha o pipeline por causa de
+# um teste de conformidade reprovado (ver "continue-on-error" abaixo);
+# ele só torna o desvio visível no resumo da execução.
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  # Permite rodar manualmente pela aba Actions do GitHub a qualquer momento.
+  workflow_dispatch:
+
+jobs:
+  verificar-conformidade-adrs:
+    name: Verificar conformidade com os ADRs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependências
+        working-directory: backend
+        run: npm install
+
+      - name: Rodar suíte de conformidade (tests/adr)
+        id: testes_adr
+        working-directory: backend
+        # continue-on-error: um ponto do ADR ainda não implementado (ou uma
+        # regressão) deve aparecer no resumo, não travar o merge. O status
+        # de cada verificação individual continua visível no relatório.
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          npx jest --config jest.adr.config.js --json --outputFile=reports/adr-results.json --runInBand
+
+      - name: Publicar resumo de conformidade no Job Summary
+        if: always()
+        working-directory: backend
+        run: node scripts/gerar-resumo-adr.js reports/adr-results.json
+
+      - name: Publicar resultado bruto como artefato
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: adr-compliance-results
+          path: backend/reports/adr-results.json
+          retention-days: 30
+
+      - name: Alertar (sem falhar o job) se alguma verificação de ADR não passou
+        if: steps.testes_adr.outcome == 'failure'
+        run: |
+          echo "::warning::Uma ou mais verificações de conformidade com os ADRs falharam. Veja o Job Summary para detalhes. Este workflow não bloqueia o merge de propósito."

@@ -15,7 +15,7 @@ api.interceptors.request.use((config) => {
 export const registrar = (dados) => api.post("/auth/registrar", dados).then((r) => r.data);
 export const login = (dados) => api.post("/auth/login", dados).then((r) => r.data);
 export const consultarSaldo = () => api.get("/contas/saldo").then((r) => r.data);
-export const consultarExtrato = () => api.get("/contas/extrato").then((r) => r.data);
+export const consultarExtrato = (params = {}) => api.get("/contas/extrato", { params }).then((r) => r.data);
 export const solicitarTransferencia = (dados) => api.post("/transferencias", dados).then((r) => r.data);
 
 export { API_URL };
