@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { consultarSaldo, consultarExtrato } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { formatarMoeda } from "../utils/moeda";
 
 export default function Dashboard() {
   const { usuario, sair, notificacoes } = useAuth();
@@ -63,7 +64,7 @@ export default function Dashboard() {
 
       <p style={{ marginBottom: 4 }}>Saldo disponível</p>
       <div className="saldo">
-        R$ {Number(saldo?.saldo).toFixed(2)}
+        {formatarMoeda(saldo?.saldo)}
       </div>
 
       <Link to="/transferencia">
@@ -75,7 +76,7 @@ export default function Dashboard() {
           <strong>Notificações recentes:</strong>
           <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14 }}>
             {notificacoes.map((n) => (
-              <li key={n.transacaoId}>Você recebeu R$ {Number(n.valor).toFixed(2)}</li>
+              <li key={n.transacaoId}>Você recebeu {formatarMoeda(n.valor)}</li>
             ))}
           </ul>
         </div>
@@ -95,7 +96,7 @@ export default function Dashboard() {
           {extrato.map((t) => (
             <tr key={t.id}>
               <td>{t.tipo}</td>
-              <td>R$ {Number(t.valor).toFixed(2)}</td>
+              <td>{formatarMoeda(t.valor)}</td>
               <td>
                 <span className={`badge ${t.status}`}>{t.status}</span>
               </td>

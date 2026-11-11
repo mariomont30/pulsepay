@@ -25,8 +25,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("pulsepay_usuario");
     setToken(null);
     setUsuario(null);
+    setNotificacoes([]);
     if (socket) socket.disconnect();
   }, [socket]);
+
+  useEffect(() => {
+    window.addEventListener("pulsepay:sessao-expirada", sair);
+    return () => window.removeEventListener("pulsepay:sessao-expirada", sair);
+  }, [sair]);
 
   // Conecta ao WebSocket da API para receber notificações em tempo real
   // quando uma transferência destinada a este usuário é concluída pelo Worker.

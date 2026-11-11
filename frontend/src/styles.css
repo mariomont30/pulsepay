@@ -106,3 +106,5 @@ th, td {
 .badge.PENDENTE { background: #fef3c7; color: #92400e; }
 .badge.CONCLUIDO { background: #d1fae5; color: #065f46; }
 .badge.FALHOU { background: #fee2e2; color: #991b1b; }
+
+form label { display: block; text-align: left; font-weight: 600; font-size: 14px; margin-top: 8px; }

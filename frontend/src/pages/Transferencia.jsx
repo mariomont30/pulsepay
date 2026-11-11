@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { solicitarTransferencia } from "../services/api";
+import { solicitarTransferencia, consultarTransferencia } from "../services/api";
+import { formatarMoeda } from "../utils/moeda";
 
 export default function Transferencia() {
   const [emailDestino, setEmailDestino] = useState("");
@@ -18,6 +19,12 @@ export default function Transferencia() {
     try {
       const dados = await solicitarTransferencia({ emailDestino, valor: Number(valor) });
       setResultado(dados);
+      for (let tentativa = 0; tentativa < 60; tentativa++) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const atual = await consultarTransferencia(dados.id);
+        setResultado(atual);
+        if (atual.status !== "PENDENTE") break;
+      }
     } catch (err) {
       setErro(err.response?.data?.erro || "Falha ao solicitar transferência");
     } finally {
@@ -29,19 +36,19 @@ export default function Transferencia() {
     <div className="container">
       <h1>Nova transferência</h1>
       <p style={{ color: "#666", fontSize: 14 }}>
-        Informe o e-mail cadastrado do destinatário (não é preciso saber o UUID da conta dele).
-        A confirmação é assíncrona: a resposta abaixo indica que a solicitação foi recebida
-        (status <strong>PENDENTE</strong>); o Worker efetiva o débito/crédito em seguida.
+        Informe o e-mail do destinatário e o valor. Acompanhe a confirmação abaixo.
       </p>
       <form onSubmit={handleSubmit}>
-        <input
+        <label htmlFor="destinatario">E-mail do destinatário</label>
+        <input id="destinatario"
           type="email"
           placeholder="E-mail do destinatário"
           value={emailDestino}
           onChange={(e) => setEmailDestino(e.target.value)}
           required
         />
-        <input
+        <label htmlFor="valor">Valor em reais</label>
+        <input id="valor"
           type="number"
           step="0.01"
           min="0.01"
@@ -50,10 +57,11 @@ export default function Transferencia() {
           onChange={(e) => setValor(e.target.value)}
           required
         />
-        {erro && <span className="erro">{erro}</span>}
+        {erro && <span className="erro" role="alert">{erro}</span>}
         {resultado && (
-          <span className="sucesso">
-            Solicitação recebida! Status: {resultado.status} (ID: {resultado.id.slice(0, 8)})
+          <span className={resultado.status === "FALHOU" ? "erro" : "sucesso"} role="status" aria-live="polite">
+            {resultado.status === "CONCLUIDO" ? `Transferência de ${formatarMoeda(valor)} concluída.` : resultado.status === "FALHOU" ? `Transferência não concluída: ${resultado.motivoFalha || "verifique o extrato"}.` : "Solicitação recebida. Aguardando confirmação."}
+            {" "}Status: {resultado.status}. Identificador: {resultado.id.slice(0, 8)}
           </span>
         )}
         <button type="submit" disabled={carregando}>

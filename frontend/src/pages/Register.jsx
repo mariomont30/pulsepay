@@ -31,35 +31,39 @@ export default function Register() {
   return (
     <div className="container">
       <h1>Criar conta</h1>
-      <p>Cadastro fictício (KYC básico) — projeto acadêmico, sem dados reais.</p>
+      <p>Ambiente acadêmico. Utilize somente dados fictícios.</p>
       <form onSubmit={handleSubmit}>
-        <input
+        <label htmlFor="nome">Nome completo</label>
+        <input id="nome"
           placeholder="Nome completo"
           value={form.nome}
           onChange={(e) => atualizarCampo("nome", e.target.value)}
           required
         />
-        <input
+        <label htmlFor="email">E-mail</label>
+        <input id="email"
           type="email"
           placeholder="E-mail"
           value={form.email}
           onChange={(e) => atualizarCampo("email", e.target.value)}
           required
         />
-        <input
+        <label htmlFor="cpf">CPF fictício</label>
+        <input id="cpf"
           placeholder="CPF fictício (somente números, 11 dígitos)"
           value={form.cpf}
           onChange={(e) => atualizarCampo("cpf", e.target.value)}
           required
         />
-        <input
+        <label htmlFor="senha">Senha</label>
+        <input id="senha"
           type="password"
           placeholder="Senha (mín. 6 caracteres)"
           value={form.senha}
           onChange={(e) => atualizarCampo("senha", e.target.value)}
           required
         />
-        {erro && <span className="erro">{erro}</span>}
+        {erro && <span className="erro" role="alert">{erro}</span>}
         {sucesso && <span className="sucesso">Cadastro realizado! Redirecionando...</span>}
         <button type="submit" disabled={carregando}>
           {carregando ? "Cadastrando..." : "Cadastrar"}

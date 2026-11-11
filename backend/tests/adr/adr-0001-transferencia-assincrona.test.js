@@ -49,7 +49,7 @@ describe("ADR-0001: transferência assíncrona com RabbitMQ e Worker", () => {
     expect(prisma.transacao.create.mock.calls[0][0].data.status).toBe("PENDENTE");
   });
 
-  test("decisão 3: a mensagem publicada é persistente e contém somente o identificador da transferência", async () => {
+  test("decisão 3: mensagem persistente contém identificador e timestamp, sem dados financeiros", async () => {
     prisma.conta.findUnique
       .mockResolvedValueOnce({ id: CONTA_ORIGEM_ID, usuarioId: USUARIO_ORIGEM_ID, saldo: 500 })
       .mockResolvedValueOnce({ id: CONTA_DESTINO_ID, status: "ATIVA" });
@@ -100,8 +100,8 @@ describe("ADR-0001: transferência assíncrona com RabbitMQ e Worker", () => {
     await expect(consultarTransferencia("usuario-nao-envolvido", "t1")).rejects.toMatchObject({ status: 403 });
   });
 
-  test("decisão 6: remetente e destinatário conseguem consultar normalmente a própria transferência", async () => {
-    prisma.conta.findUnique.mockResolvedValueOnce({ id: CONTA_ORIGEM_ID });
+  test.each([CONTA_ORIGEM_ID, CONTA_DESTINO_ID])("decisão 6: participante da conta %s consulta a própria transferência", async (contaId) => {
+    prisma.conta.findUnique.mockResolvedValueOnce({ id: contaId });
     prisma.transacao.findUnique.mockResolvedValueOnce({
       id: "t1",
       contaOrigemId: CONTA_ORIGEM_ID,

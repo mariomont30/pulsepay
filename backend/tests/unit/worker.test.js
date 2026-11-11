@@ -34,7 +34,7 @@ function criarTxMock({ saldoOrigem, saldoDestino }) {
         ),
       update: jest.fn(),
     },
-    transacao: { update: jest.fn().mockResolvedValue({ id: TRANSACAO_ID, concluidoEm: new Date() }) },
+    transacao: { findUnique: jest.fn().mockResolvedValue({status: "PENDENTE"}), update: jest.fn().mockResolvedValue({ id: TRANSACAO_ID, concluidoEm: new Date() }) },
     auditoria: { create: jest.fn() },
   };
 }
@@ -101,4 +101,18 @@ describe("worker.efetivarTransferencia", () => {
     });
     expect(canalMock.sendToQueue).toHaveBeenCalledTimes(1);
   });
+});
+
+// Regressão adicionada em 16/10/2026: a leitura externa pode ficar obsoleta.
+test("reentrega concorrente não repete débito após outra efetivação", async () => {
+  jest.clearAllMocks();
+  prisma.transacao.findUnique.mockResolvedValueOnce({id: TRANSACAO_ID,status: "PENDENTE",contaOrigemId: CONTA_ORIGEM_ID,contaDestinoId: CONTA_DESTINO_ID,valor: 100});
+  const tx = criarTxMock({saldoOrigem: 400,saldoDestino: 150});
+  tx.transacao.findUnique.mockResolvedValue({status: "CONCLUIDO"});
+  prisma.$transaction.mockImplementationOnce(callback => callback(tx));
+  const canal = {sendToQueue: jest.fn()};getChannel.mockReturnValue(canal);
+  await efetivarTransferencia(TRANSACAO_ID);
+  expect(tx.conta.update).not.toHaveBeenCalled();
+  expect(tx.auditoria.create).not.toHaveBeenCalled();
+  expect(canal.sendToQueue).not.toHaveBeenCalled();
 });

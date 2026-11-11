@@ -38,10 +38,11 @@ describe("ADR-0001 (decisão 7): Worker só confirma consumo (ack) após o commi
   beforeEach(() => jest.clearAllMocks());
 
   test("dá ack somente depois que a efetivação (transação ACID) termina com sucesso", async () => {
+    const ordem = [];
     const canalMock = {
       prefetch: jest.fn(),
       consume: jest.fn(),
-      ack: jest.fn(),
+      ack: jest.fn(() => ordem.push('ack')),
       nack: jest.fn(),
       sendToQueue: jest.fn(),
     };
@@ -54,23 +55,28 @@ describe("ADR-0001 (decisão 7): Worker só confirma consumo (ack) após o commi
       contaDestinoId: "c2",
       valor: 100,
     });
-    prisma.$transaction.mockImplementationOnce(async (cb) =>
-      cb({
+    prisma.$transaction.mockImplementationOnce(async (cb) => {
+      ordem.push('inicio-transacao');
+      const resultado = await cb({
         $queryRawUnsafe: jest.fn(),
         conta: {
           findUnique: jest.fn().mockResolvedValue({ id: "c1", saldo: 500, usuarioId: "u2" }),
           update: jest.fn(),
         },
-        transacao: { update: jest.fn().mockResolvedValue({ id: "t1", concluidoEm: new Date() }) },
+        transacao: { findUnique: jest.fn().mockResolvedValue({status: "PENDENTE"}), update: jest.fn().mockResolvedValue({ id: "t1", concluidoEm: new Date() }) },
         auditoria: { create: jest.fn() },
-      })
-    );
+      });
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      ordem.push('commit');
+      return resultado;
+    });
 
     const msg = { content: Buffer.from(JSON.stringify({ transacaoId: "t1" })) };
     await callback(msg);
 
     expect(canalMock.ack).toHaveBeenCalledWith(msg);
     expect(canalMock.nack).not.toHaveBeenCalled();
+    expect(ordem).toEqual(['inicio-transacao', 'commit', 'ack']);
   });
 
   test("NÃO dá ack (e faz nack com requeue) quando a efetivação lança um erro inesperado", async () => {

@@ -12,7 +12,7 @@ const METRICS_PORT = process.env.WORKER_METRICS_PORT || 4001;
 
 /**
  * Efetiva o débito/crédito de uma transferência de forma atômica.
- * Usa `SELECT ... FOR UPDATE` (lock pessimista) nas duas contas, na MESMA
+ * Usa `SELECT ... FOR NO KEY UPDATE` nas duas contas, na MESMA
  * ordem sempre (por id), para evitar tanto race condition (saldo negativo
  * por leituras concorrentes) quanto deadlock entre transferências cruzadas.
  * Ver README seção 7 (Riscos Conhecidos: Atomicidade / Race condition).
@@ -36,9 +36,15 @@ async function efetivarTransferencia(transacaoId) {
 
   try {
     const eventoNotificacao = await prisma.$transaction(async (tx) => {
-      // Lock nas duas contas em ordem determinística (evita deadlock)
-      await tx.$queryRawUnsafe(`SELECT id FROM "Conta" WHERE id = $1 FOR UPDATE`, idMenor);
-      await tx.$queryRawUnsafe(`SELECT id FROM "Conta" WHERE id = $1 FOR UPDATE`, idMaior);
+      // Serializa alterações de saldo sem bloquear KEY SHARE das inserções
+      // concorrentes em Transacao, cujas chaves estrangeiras referenciam Conta.
+      await tx.$queryRawUnsafe(`SELECT id FROM "Conta" WHERE id = $1 FOR NO KEY UPDATE`, idMenor);
+      await tx.$queryRawUnsafe(`SELECT id FROM "Conta" WHERE id = $1 FOR NO KEY UPDATE`, idMaior);
+
+      // Releitura sob os bloqueios das contas: uma entrega concorrente pode
+      // ter concluído a transação enquanto esta execução aguardava o lock.
+      const estadoAtual = await tx.transacao.findUnique({ where: { id: transacaoId } });
+      if (!estadoAtual || estadoAtual.status !== "PENDENTE") return { ignorada: true };
 
       const contaOrigem = await tx.conta.findUnique({ where: { id: transacaoAtual.contaOrigemId } });
       const contaDestino = await tx.conta.findUnique({ where: { id: transacaoAtual.contaDestinoId } });
@@ -83,6 +89,8 @@ async function efetivarTransferencia(transacaoId) {
         concluidoEm: transacaoAtualizada.concluidoEm,
       };
     });
+
+    if (eventoNotificacao?.ignorada) return;
 
     const tempoSegundos = (Date.now() - inicio) / 1000;
     transferenciaTempoConfirmacaoSegundos.observe(tempoSegundos);

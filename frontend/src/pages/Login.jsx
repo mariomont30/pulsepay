@@ -28,18 +28,20 @@ export default function Login() {
 
   return (
     <div className="container">
-      <h1>PulsePay</h1>
+      <h1><img src="/pulsepay-logo.svg" alt="PulsePay" style={{width: 220, height: 55}} /></h1>
       <p>Entrar na sua conta</p>
       <form onSubmit={handleSubmit}>
-        <input type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input
+        <label htmlFor="email">E-mail</label>
+        <input id="email" autoComplete="email" type="email" placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <label htmlFor="senha">Senha</label>
+        <input id="senha" autoComplete="current-password"
           type="password"
           placeholder="Senha"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
           required
         />
-        {erro && <span className="erro">{erro}</span>}
+        {erro && <span className="erro" role="alert">{erro}</span>}
         <button type="submit" disabled={carregando}>
           {carregando ? "Entrando..." : "Entrar"}
         </button>
